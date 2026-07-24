@@ -36,6 +36,7 @@
   .kicker { font-size: 12px; letter-spacing: 0.14em; color: #C9CDD4; font-weight: 800; }
   .title-row { display: flex; align-items: center; gap: 8px; }
   .brand-logo { height: 32px; width: auto; flex-shrink: 0; }
+  .brand-logo-large { height: 56px; width: auto; flex-shrink: 0; }
   .title-icon { height: 22px; width: auto; vertical-align: middle; margin: 0 4px; }
   .coin-icon { height: 14px; width: 14px; vertical-align: middle; margin-right: 3px; border-radius: 50%; }
   .miner-photo {
@@ -45,11 +46,17 @@
   .miner-photo.loaded { display: block; }
   .title {
     font-family: 'Cinzel', serif;
-    font-size: 22px;
     font-weight: 700;
     margin: 0;
     letter-spacing: 0.01em;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
   }
+  .title-line-1 { font-size: 30px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .title-line-2 { font-size: 20px; font-weight: 600; }
+  .title-line-2b { font-size: 22px; font-weight: 600; }
+  .brand-logo-inline { height: 34px; width: auto; flex-shrink: 0; }
   .sub { color: var(--text-muted); font-size: 12.5px; margin: 0; }
   .tagline {
     font-size: 10px; letter-spacing: 0.22em; color: var(--text-muted-3);
@@ -287,10 +294,12 @@
       <div class="kicker">SCRYPT · LTC / DOGE</div>
       <div class="title-row">
         <h1 class="title title-chrome">
-          <img src="https://honest.money/assets/honest-money-mark-BJPLFQTC.png" alt="" class="title-icon" />
-          Honest.Money
-          <img src="https://honest.money/assets/honest-money-mark-BJPLFQTC.png" alt="" class="title-icon" />
-          <br>Home Miner Break-Even Calculator
+          <span class="title-line-1">
+            <img src="https://honest.money/assets/honest-money-mark-BJPLFQTC.png" alt="Honest Money logo" class="brand-logo-inline" />
+            Honest.Money
+          </span>
+          <span class="title-line-2b">Home Miner</span>
+          <span class="title-line-2">Break-Even Calculator</span>
         </h1>
       </div>
       <p class="sub">Watts in, coins out — see where the line crosses zero.</p>
