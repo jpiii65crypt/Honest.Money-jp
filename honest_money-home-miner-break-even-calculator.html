@@ -463,11 +463,11 @@
               <p class="hint">Difficulty drifts week to week — update these for current network values.</p>
               <div class="efficiency-box">
                 <div class="efficiency-title">Network Efficiency</div>
-                <div class="hint" style="margin:0 0 4px">avg vs. peak hashrate — click a row to use it in the calculation</div>
+                <div class="hint" style="margin:0 0 4px">actual vs. expected LTC/DOGE blocks found — click a row to use it in the calculation</div>
+                <div class="efficiency-row" id="effRow24h" data-window="24h"><span>24 hours</span><span id="eff24h">loading…</span></div>
                 <div class="efficiency-row" id="effRow7d" data-window="7d"><span>7 days</span><span id="eff7d">loading…</span></div>
                 <div class="efficiency-row" id="effRow30d" data-window="30d"><span>30 days</span><span id="eff30d">loading…</span></div>
-                <div class="efficiency-row" id="effRow6mo" data-window="6mo"><span>6 months</span><span id="eff6mo">loading…</span></div>
-                <p class="hint">The selected figure scales the "Estimated Daily Coins Received" above — e.g. 90% efficiency means your yield is calculated at 90% of the theoretical max, reflecting real recent uptime.</p>
+                <p class="hint">The selected figure scales the "Estimated Daily Coins Received" above — e.g. 90% efficiency means your yield is calculated at 90% of the theoretical max, reflecting real recent blocks found vs. expected.</p>
               </div>
             </div>
           </div>
@@ -840,12 +840,12 @@
       poolEfficiency = eff;
       recalc();
     }
-    ["7d", "30d", "6mo"].forEach((w) => {
+    ["24h", "7d", "30d"].forEach((w) => {
       document.getElementById(`effRow${w}`).classList.toggle("active", w === selectedEffWindow);
     });
   }
 
-  ["7d", "30d", "6mo"].forEach((w) => {
+  ["24h", "7d", "30d"].forEach((w) => {
     document.getElementById(`effRow${w}`).addEventListener("click", () => {
       selectedEffWindow = w;
       applySelectedEfficiency();
@@ -853,41 +853,70 @@
   });
 
   async function loadPoolEfficiency() {
-    const elIds = { "7d": "eff7d", "30d": "eff30d", "6mo": "eff6mo" };
+    const elIds = { "24h": "eff24h", "7d": "eff7d", "30d": "eff30d" };
+    const windows = [
+      { label: "24h", seconds: 24 * 60 * 60, blocksKey: "blocks_24h_by_symbol" },
+      { label: "7d", seconds: 7 * 24 * 60 * 60, blocksKey: "blocks_7d_by_symbol" },
+      { label: "30d", seconds: 30 * 24 * 60 * 60, blocksKey: "blocks_30d_by_symbol" },
+    ];
+
     try {
-      const res = await fetch("./efficiency-history.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("Fetch failed");
-      const history = await res.json();
-      if (!Array.isArray(history) || history.length === 0) {
-        Object.values(elIds).forEach((id) => (document.getElementById(id).textContent = "no data yet"));
-        return;
+      const summaryRes = await fetch("https://pool.honest.money/api/pool/pool/summary", { cache: "no-store" });
+      if (!summaryRes.ok) throw new Error("Summary fetch failed");
+      const summary = await summaryRes.json();
+
+      const effByCoin = {};
+      (summary.effort || []).forEach((e) => {
+        effByCoin[e.symbol] = e;
+      });
+      const ltcDifficultyLive = effByCoin.LTC ? effByCoin.LTC.network_difficulty : null;
+      const dogeDifficultyLive = effByCoin.DOGE ? effByCoin.DOGE.network_difficulty : null;
+
+      // Fetch hashrate series for the windows we can (API supports up to 30d)
+      const hashSeries = {};
+      for (const w of ["24h", "7d", "30d"]) {
+        try {
+          const r = await fetch(`https://pool.honest.money/api/pool/pool/hashrate?window=${w}&algo=scrypt`, { cache: "no-store" });
+          if (r.ok) {
+            const data = await r.json();
+            hashSeries[w] = data.points || [];
+          }
+        } catch (e) {
+          hashSeries[w] = [];
+        }
       }
 
-      const now = Date.now();
-      const peak = history.reduce((max, e) => Math.max(max, e.mhs || 0), 0);
-
-      const windows = [
-        { label: "7d", ms: 7 * 24 * 60 * 60 * 1000, minPoints: 4 },
-        { label: "30d", ms: 30 * 24 * 60 * 60 * 1000, minPoints: 5 },
-        { label: "6mo", ms: 182 * 24 * 60 * 60 * 1000, minPoints: 8 },
-      ];
-
-      windows.forEach(({ label, ms, minPoints }) => {
+      windows.forEach(({ label, seconds, blocksKey }) => {
         const el = document.getElementById(elIds[label]);
-        const entries = history.filter((e) => now - e.ts <= ms && typeof e.mhs === "number");
-        if (entries.length < minPoints || peak <= 0) {
+        const points = hashSeries[label] || [];
+        const ltcBlocksActual = summary[blocksKey] ? summary[blocksKey].LTC : undefined;
+        const dogeBlocksActual = summary[blocksKey] ? summary[blocksKey].DOGE : undefined;
+
+        if (!points.length || ltcBlocksActual == null || dogeBlocksActual == null || !ltcDifficultyLive || !dogeDifficultyLive) {
           el.textContent = "not enough data yet";
           return;
         }
-        const avg = entries.reduce((sum, e) => sum + e.mhs, 0) / entries.length;
-        const eff = avg / peak;
-        efficiencyByWindow[label] = eff;
-        el.textContent = `${(eff * 100).toFixed(1)}%`;
+
+        const avgHashrate = points.reduce((sum, p) => sum + (p.hashrate || 0), 0) / points.length;
+
+        const ltcExpected = (avgHashrate * seconds) / (ltcDifficultyLive * TWO_32);
+        const dogeExpected = (avgHashrate * seconds) / (dogeDifficultyLive * TWO_32);
+
+        const ltcEff = ltcExpected > 0 ? ltcBlocksActual / ltcExpected : null;
+        const dogeEff = dogeExpected > 0 ? dogeBlocksActual / dogeExpected : null;
+
+        const validEffs = [ltcEff, dogeEff].filter((v) => typeof v === "number" && isFinite(v));
+        if (validEffs.length === 0) {
+          el.textContent = "not enough data yet";
+          return;
+        }
+        const blended = validEffs.reduce((a, b) => a + b, 0) / validEffs.length;
+        efficiencyByWindow[label] = Math.min(blended, 3); // cap absurd outliers from tiny-sample windows
+        el.textContent = `${(blended * 100).toFixed(1)}%`;
       });
 
-      // Default to 30-day if available, else fall back to whatever is available
       if (!(selectedEffWindow in efficiencyByWindow)) {
-        selectedEffWindow = ["30d", "7d", "6mo"].find((w) => w in efficiencyByWindow) || "30d";
+        selectedEffWindow = ["30d", "7d", "24h"].find((w) => w in efficiencyByWindow) || "30d";
       }
       applySelectedEfficiency();
     } catch (e) {
@@ -897,6 +926,7 @@
   fetchPrice("fetchLtc", ltcPriceInput, "ltcStatus");
   fetchPrice("fetchDoge", dogePriceInput, "dogeStatus");
   setInterval(fetchDifficulties, 5 * 60 * 1000);
+  setInterval(loadPoolEfficiency, 5 * 60 * 1000);
 
   async function fetchDifficulties() {
     try {
