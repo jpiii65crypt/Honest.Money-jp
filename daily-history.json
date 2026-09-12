@@ -1,11 +1,11 @@
 [
   {
     "date": "2026-09-12",
-    "ts": 1789255665000,
+    "ts": 1789257130084,
     "ltcHeight": 3176672,
-    "dogeHeight": 6371118,
+    "dogeHeight": 6371866,
     "ltcDifficulty": 92180564.9,
-    "dogeDifficulty": 38275854.4,
-    "avgHashrate": 19618088571765.445
+    "dogeDifficulty": 27663031.5,
+    "avgHashrate": 18735683222276.75
   }
 ]
