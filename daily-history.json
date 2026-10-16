@@ -304,5 +304,14 @@
     "ltcDifficulty": 87856932.7,
     "dogeDifficulty": 20119212.6,
     "avgHashrate": 19362587120382.293
+  },
+  {
+    "date": "2026-10-16",
+    "ts": 1792123196826,
+    "ltcHeight": 3195774,
+    "dogeHeight": 6417053,
+    "ltcDifficulty": 83522829.3,
+    "dogeDifficulty": 41412972.7,
+    "avgHashrate": 19487642608198.375
   }
 ]
